@@ -1,4 +1,4 @@
-# Agentverse Study Buddy
+# AgentVerse Study Buddy
 
 > **Autonomous AI agents that think, teach, and guide you through personalized exam preparation**
 
