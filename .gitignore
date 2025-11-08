@@ -17,3 +17,7 @@ dist/
 build/
 chroma_db/
 test.db
+.env
+.env.local
+*.db
+*.db-journal

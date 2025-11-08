@@ -9,13 +9,26 @@ CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 # --- ChromaDB Client ---
-client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+# Only initialize client when needed, not at module import
+_client = None
+_sentence_transformer_ef = None
 
-# --- Embedding Function ---
-# Using a sentence-transformer model for embeddings
-sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name=EMBEDDING_MODEL_NAME
-)
+def get_client():
+    """Lazy initialization of ChromaDB client."""
+    global _client
+    if _client is None:
+        _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    return _client
+
+def get_embedding_function():
+    """Lazy initialization of embedding function."""
+    global _sentence_transformer_ef
+    if _sentence_transformer_ef is None:
+        # Using a sentence-transformer model for embeddings
+        _sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name=EMBEDDING_MODEL_NAME
+        )
+    return _sentence_transformer_ef
 
 # --- RAG System Class ---
 class RAGSystem:
@@ -25,13 +38,21 @@ class RAGSystem:
         """Initializes the RAG system for a given user."""
         self.user_id = user_id
         self.collection_name = f"user_{user_id}_documents"
-        self.collection = client.get_or_create_collection(
-            name=self.collection_name,
-            embedding_function=sentence_transformer_ef
-        )
+        self.collection = None  # Lazy-loaded
+        
+    def _ensure_collection(self):
+        """Ensures the collection is initialized."""
+        if self.collection is None:
+            client = get_client()
+            embedding_fn = get_embedding_function()
+            self.collection = client.get_or_create_collection(
+                name=self.collection_name,
+                embedding_function=embedding_fn
+            )
 
     async def add_document(self, document_id: str, text: str, metadata: dict = None):
         """Adds or updates a document in the user's collection."""
+        self._ensure_collection()
         if metadata is None:
             metadata = {}
         metadata["user_id"] = self.user_id
@@ -45,6 +66,7 @@ class RAGSystem:
 
     async def add_documents(self, texts: list, source: str):
         """Adds multiple documents to the user's collection."""
+        self._ensure_collection()
         for i, text in enumerate(texts):
             document_id = f"{source}_{i}"
             metadata = {"user_id": self.user_id, "source": source}
@@ -56,6 +78,7 @@ class RAGSystem:
 
     async def query(self, query_text: str, n_results: int = 5) -> str:
         """Queries the collection for relevant documents."""
+        self._ensure_collection()
         results = self.collection.query(
             query_texts=[query_text],
             n_results=n_results,
@@ -68,4 +91,5 @@ class RAGSystem:
 
     async def delete_document(self, document_id: str):
         """Deletes a document from the collection."""
+        self._ensure_collection()
         self.collection.delete(ids=[document_id])

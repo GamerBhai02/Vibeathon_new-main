@@ -1,6 +1,6 @@
 """Main FastAPI application."""
 
-from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from typing import List
@@ -22,9 +22,12 @@ from .services import (
 app = FastAPI()
 
 # --- Middleware ---
+# Get allowed origins from environment variable or use defaults
+allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Adjust for your frontend URL
+    allow_origins=allowed_origins,  # Configurable for different environments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -225,6 +228,126 @@ async def ingest_document(
             status_code=500,
             detail=f"Error processing document: {str(e)}"
         )
+
+@app.post("/agents/lesson")
+async def generate_lesson(
+    topic_name: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+):
+    """Generates a micro-lesson on a specific topic using TeacherAgent."""
+    from .agents.teacher import TeacherAgent
+    agent = TeacherAgent()
+    try:
+        lesson = await agent.generate_lesson(topic_name, str(current_user.id))
+        return lesson
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating lesson: {e}")
+
+@app.post("/agents/plan")
+async def generate_study_plan(
+    exam_type: str = Body(..., embed=True),
+    exam_date: str = Body(..., embed=True),
+    hours_per_day: int = Body(..., embed=True),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Generates a study plan using PlannerAgent."""
+    from .agents.planner import PlannerAgent
+    agent = PlannerAgent()
+    try:
+        topics = session.exec(select(Topic).where(Topic.userId == current_user.id)).all()
+        plan = await agent.generate_plan(topics, exam_type, exam_date, hours_per_day)
+        return plan
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating plan: {e}")
+
+@app.post("/agents/schedule")
+async def create_schedule(
+    start_date: str = Body(..., embed=True),
+    end_date: str = Body(..., embed=True),
+    hours_per_day: int = Body(..., embed=True),
+    preferences: dict = Body(None, embed=True),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Creates a detailed study schedule using SchedulerAgent."""
+    from .agents.scheduler import SchedulerAgent
+    agent = SchedulerAgent()
+    try:
+        topics = session.exec(select(Topic).where(Topic.userId == current_user.id)).all()
+        schedule = await agent.create_schedule(topics, start_date, end_date, hours_per_day, preferences)
+        return schedule
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating schedule: {e}")
+
+@app.post("/agents/placement/interview-prep")
+async def generate_interview_prep(
+    topic: str = Body(..., embed=True),
+    difficulty: str = Body("medium", embed=True),
+    company_type: str = Body("general", embed=True),
+):
+    """Generates interview preparation materials using PlacementAgent."""
+    from .agents.placement import PlacementAgent
+    agent = PlacementAgent()
+    try:
+        prep_materials = await agent.generate_interview_prep(topic, difficulty, company_type)
+        return prep_materials
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating interview prep: {e}")
+
+@app.post("/agents/placement/roadmap")
+async def create_placement_roadmap(
+    target_role: str = Body(..., embed=True),
+    current_skills: List[str] = Body(..., embed=True),
+    target_date: str = Body(..., embed=True),
+):
+    """Creates a placement preparation roadmap using PlacementAgent."""
+    from .agents.placement import PlacementAgent
+    agent = PlacementAgent()
+    try:
+        roadmap = await agent.create_study_roadmap(target_role, current_skills, target_date)
+        return roadmap
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating roadmap: {e}")
+
+@app.websocket("/ws/agent")
+async def websocket_agent_console(websocket: WebSocket):
+    """WebSocket endpoint for real-time agent interaction using AgentOrchestrator."""
+    await websocket.accept()
+    
+    # Note: In production, you'd want to authenticate the WebSocket connection
+    # For now, we'll use a dummy user ID
+    user_id = "1"
+    
+    try:
+        from .agents.orchestrator import AgentOrchestrator
+        
+        # Receive the user's goal
+        data = await websocket.receive_json()
+        goal = data.get("goal", "")
+        
+        if not goal:
+            await websocket.send_json({"type": "error", "data": {"text": "No goal provided"}})
+            return
+        
+        # Create orchestrator and run
+        orchestrator = AgentOrchestrator(user_id)
+        
+        # Stream agent events back to client
+        async for event in orchestrator.run(goal):
+            await websocket.send_json(event.dict())
+        
+    except WebSocketDisconnect:
+        print("WebSocket disconnected")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "data": {"text": f"An error occurred: {str(e)}"}
+            })
+        except:
+            pass
 
 # --- Database Initialization ---
 

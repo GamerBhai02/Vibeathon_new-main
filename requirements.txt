@@ -7,5 +7,11 @@ chromadb
 sentence-transformers
 anthropic
 google-api-python-client
+google-generativeai
 pydantic-settings
 sqlalchemy
+pytesseract
+pdf2image
+python-magic
+pillow
+websockets
