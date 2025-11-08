@@ -21,3 +21,4 @@ test.db
 .env.local
 *.db
 *.db-journal
+uploads/
