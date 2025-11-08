@@ -134,9 +134,7 @@ def parse_llm_output(text: str) -> list | dict:
         return json.loads(text)
     except json.JSONDecodeError:
         # If it fails, try to find the JSON block within the text
-        match = re.search(r"```json
-(.*)
-```", text, re.DOTALL)
+        match = re.search(r"```json\n(.*)\n```", text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(1))

@@ -15,3 +15,4 @@ pdf2image
 python-magic
 pillow
 websockets
+python-multipart
