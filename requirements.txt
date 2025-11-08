@@ -10,6 +10,7 @@ sqlalchemy
 websockets
 python-multipart
 python-jose[cryptography]
+pdfminer.six
 
 # Optional heavy dependencies - only install if needed
 # Uncomment these if you need document processing features:
