@@ -1,0 +1,439 @@
+You are Replit AI. Build a production-ready, full-stack web app called Agentverse Study Buddy that demonstrates autonomous AI agents (plan, reason, act) for exam preparation and placement coaching. Follow the spec exactly. Generate all code, configs, scripts, and seed data. When uncertain, choose the simplest robust option and implement it.
+0) Goal & Judging Fit
+Theme: Agentverse: The Era of Autonomous AI
+
+
+Tagline: “Code agents that think, talk, and act.”
+
+
+Judging focus to hit: Autonomy, Intelligence, Creativity, Replit Integration.
+
+
+The app must:
+
+
+Ingest PYQs, teacher notes, mock papers.
+
+
+Plan personalized study paths.
+
+
+Teach topics step-by-step and generate practice with worked solutions.
+
+
+Create exam-accurate mock tests (CIE/SEE/Lab).
+
+
+Provide Placement Mode (company-aware prep).
+
+
+Run an autonomous agent loop (plan → act with tools → reflect → update memory).
+
+
+Be one-click deployable on Replit Deployments with secrets.
+
+
+1) Tech Stack (must use)
+Frontend: React + Vite + TypeScript + TailwindCSS.
+
+
+Backend: Python FastAPI.
+
+
+Agents/Orchestration: Python, LangChain (or LlamaIndex), tool calling.
+
+
+Embeddings & Vector DB: sentence-transformers/all-MiniLM-L6-v2 + FAISS (local file store).
+
+
+DB: SQLite (SQLModel) for users, exams, attempts, flashcards, schedules.
+
+
+OCR: Tesseract (pytesseract) for PDFs/images.
+
+
+Code Runner (placement coding rounds): Judge0 public API (wrap w/ fallback mock).
+
+
+YouTube suggestions: YouTube Data API (wrap in tool; also provide offline mock mode).
+
+
+Auth: Email-only magic link (dev-mode simple token), JWT for sessions.
+
+
+Env/Secrets (Replit): Read via os.getenv, names listed below.
+
+
+Testing: Pytest (backend), basic Playwright smoke for UI.
+
+
+2) Monorepo Structure
+/agentverse/
+  README.md
+  replit.nix
+  .replit
+  /server            # FastAPI + Agents + Vector store
+    main.py
+    api/
+      auth.py
+      ingest.py
+      study.py
+      mocks.py
+      placement.py
+      quiz.py
+      flashcards.py
+      youtube.py
+    agents/
+      core_loop.py
+      planner_agent.py
+      teacher_agent.py
+      quizgen_agent.py
+      evaluator_agent.py
+      scheduler_agent.py
+      placement_agent.py
+      tools.py
+      memory.py
+    models/
+      db.py          # SQLModel + SQLite
+      schemas.py     # Pydantic models
+    services/
+      ocr.py
+      rag.py
+      grader.py
+      mock_builder.py
+      flashcarder.py
+      placement_fetch.py
+      youtube_tool.py
+      code_eval.py
+    vectorstore/
+      index.faiss
+      meta.json
+    seed/
+      sample_pyqs/
+      teacher_notes/
+      mocks/
+    tests/
+      test_api.py
+  /web               # React + Vite + Tailwind
+    index.html
+    src/
+      main.tsx
+      App.tsx
+      lib/api.ts
+      routes/
+        Login.tsx
+        Dashboard.tsx
+        Ingest.tsx
+        Learn.tsx
+        Practice.tsx
+        MockTest.tsx
+        Placement.tsx
+        Flashcards.tsx
+      components/
+        UploadBox.tsx
+        TopicHeatmap.tsx
+        StudyPlan.tsx
+        Timer.tsx
+        QuestionCard.tsx
+        Flashcard.tsx
+        AgentConsole.tsx
+      styles/tailwind.css
+    vite.config.ts
+    package.json
+
+3) Environment Variables (create and read these)
+OPENROUTER_API_KEY                # or GEMINI_API_KEY (support both; prefer GEMINI if set)
+YOUTUBE_API_KEY               # optional; app must work without (fallback mock)
+JUDGE0_API_URL                # default https://judge0-ce.p.rapidapi.com or public instance
+JUDGE0_API_KEY                # optional; app must work without (local mock)
+JWT_SECRET                    # any random string for dev
+APP_BASE_URL                  # for magic links (dev: http://localhost:5173)
+
+Implement automatic fallback mocks if keys are missing (print banner “RUNNING IN OFFLINE MOCK MODE”).
+
+
+4) Data Models (SQLModel)
+User(id, email, name, created_at)
+
+
+Corpus(id, user_id, title, type: ["PYQ","TEACHER_NOTE","MOCK_PAPER"], path, created_at)
+
+
+Topic(id, user_id, name, importance_score, mastery_score)
+
+
+StudyPlan(id, user_id, start_date, end_date, json_plan)
+
+
+PracticeQuestion(id, user_id, topic_id, question, answer_steps, rubric, difficulty)
+
+
+MockExam(id, user_id, type: ["CIE","SEE","LAB","PLACEMENT"], spec_json)
+
+
+Attempt(id, user_id, mock_id, score, time_taken_sec, breakdown_json, created_at)
+
+
+Flashcard(id, user_id, front, back, topic_id, next_review_at, ef, interval, reps) (SM-2 fields)
+
+
+PlacementProfile(id, user_id, company, role, rounds_json, skills_json, resources_json)
+
+
+AgentRun(id, user_id, goal, plan_json, actions_json, reflections_json, status)
+
+
+5) Vector/RAG
+Build services/rag.py with:
+
+
+ingest_pdf_or_text(files|text) -> chunks with metadata
+
+
+embed_chunks -> FAISS
+
+
+retrieve(query, top_k=5) -> passages
+
+
+Store FAISS under /server/vectorstore. Persist across restarts.
+
+
+6) Agents & Autonomy
+Implement multi-agent loop with tool calling and memory. Use LangChain (Runnable + Tools). Provide a small command palette in UI to show agent thoughts/actions (safe, concise).
+Agents
+PlannerAgent: builds/updates a study plan given time to exam, PYQs importance, student weaknesses.
+
+
+TeacherAgent: generates micro-lessons and stepwise solutions with a strict “no hallucination” rule using RAG context + citations.
+
+
+QuizGenAgent: creates topic quizzes & full mocks adhering to exam specs (marks, durations, question types).
+
+
+EvaluatorAgent: grades attempts, gives rubric-aligned feedback, updates topic mastery.
+
+
+SchedulerAgent: schedules spaced repetition (SM-2) for flashcards and inserts plan blocks into StudyPlan.
+
+
+PlacementAgent: given company, role, fetches (or mocks) profile, typical rounds, FAQs, coding topics; generates company-style mock interview.
+
+
+Tools
+Define tool functions (with JSON schemas) in agents/tools.py:
+search_rag(query)
+
+
+extract_topics_from_pyqs()
+
+
+build_mock(spec)
+
+
+grade_answer(answer, rubric)
+
+
+create_flashcards(topic_or_corpus, n)
+
+
+fetch_company_profile(company) (real web if API provided; else offline curated)
+
+
+youtube_search(topic) (use API key or mock list)
+
+
+eval_code_with_judge0(lang, source) (fallback mock)
+
+
+persist_memory(key, value) / recall_memory(key) (AgentRun + SQLite)
+
+
+Core Loop
+In agents/core_loop.py implement:
+run_autonomous_session(user_id, goal: str)
+
+
+PlannerAgent drafts plan.
+
+
+TeacherAgent requests RAG, generates lessons.
+
+
+QuizGenAgent creates quizzes/mocks.
+
+
+User attempts → EvaluatorAgent updates mastery.
+
+
+SchedulerAgent updates flashcard schedule.
+
+
+Reflection: each agent logs what worked/failed; store in AgentRun.
+
+
+7) Endpoints (FastAPI)
+POST /auth/magic-link (dev: returns token)
+
+
+GET /me
+
+
+POST /ingest (upload PDFs/images/text; OCR if needed; update FAISS; extract topics)
+
+
+POST /plan/generate (deadline, exam type) → StudyPlan
+
+
+GET /plan
+
+
+POST /practice/generate (topic, difficulty) → list of PracticeQuestion
+
+
+POST /mock/generate (exam_type, duration, marks, structure) → MockExam
+
+
+POST /mock/attempt/start → returns questions & timer token
+
+
+POST /mock/attempt/submit → grades & Attempt
+
+
+POST /flashcards/generate (n, source)
+
+
+GET /flashcards/due / POST /flashcards/review
+
+
+POST /placement/profile (company, role)
+
+
+POST /agent/run (goal) → streams agent actions (Server-Sent Events or WebSocket)
+
+
+GET /youtube/suggest?topic=...
+
+
+Provide Openrouterapi docs enabled.
+8) Frontend UX (React)
+Pages & key components:
+Login: simple email box → token stored in localStorage.
+
+
+Dashboard: progress rings (mastery), upcoming study blocks, quick actions.
+
+
+Ingest: upload PYQs/notes/mocks; OCR status; topic list; importance bars.
+
+
+Learn: micro-lesson viewer with citations; “common mistakes” callouts.
+
+
+Practice: topic filter → QuestionCard (hint → steps → full solution).
+
+
+MockTest: full-screen exam mode (timer, one question per screen, submit, result breakdown).
+
+
+Placement: company input → profile, rounds, practice sets; coding pad with Judge0 run.
+
+
+Flashcards: due cards (SM-2: Again/Hard/Good/Easy).
+
+
+AgentConsole: live stream of agent plan/actions/reflections (read-only).
+
+
+Styling: Tailwind, clean cards with 2xl corners, soft shadows, keyboard shortcuts:
+g i Ingest, g l Learn, g p Practice, g m Mock, g c Placement, g f Flashcards.
+
+
+9) Safety & Quality
+RAG-first generation; include citations (source titles) under answers.
+
+
+Add “confidence” badge (Low/Med/High) per generated answer.
+
+
+Never fabricate company data if no internet; show “mock mode” badge.
+
+
+Validate mock structure (marks sum, time).
+
+
+Rate limit endpoints per token.
+
+
+Basic unit tests for: ingest → index size, quiz gen → non-empty, grader → deterministic.
+
+11) Replit Integration
+Provide .replit and replit.nix to run both server and web via foreman (or two processes).
+
+
+Add a Deployments config (Procfile) to start FastAPI (uvicorn) and serve React via a simple Node server or Vite preview in production.
+
+
+Respect Replit Secrets for all env vars.
+
+
+Script commands in root README.md:
+
+
+pip install -r server/requirements.txt
+
+
+cd web && npm i && npm run build
+
+
+python server/main.py (dev)
+
+
+make dev (concurrently web+server)
+
+
+12) Makefiles & Scripts
+Makefile:
+
+
+dev: run server + web concurrently
+
+
+seed: run python server/seed/seed.py
+
+
+test: run pytest + Playwright
+
+
+server/requirements.txt include: fastapi, uvicorn, sqlmodel, pydantic, langchain, sentence-transformers, faiss-cpu, pytesseract, pillow, python-multipart, httpx, pyjwt, numpy, scikit-learn, tenacity, pytest.
+
+
+web/package.json scripts: dev/build/preview/test.
+
+
+13) Acceptance Criteria (must pass)
+App runs locally on Replit with one click; seeding works.
+
+
+Ingesting seed files creates FAISS index and shows topics.
+
+
+Study plan is generated and persisted.
+
+
+Practice questions render with hints → steps → full solution; mastery updates after grading.
+
+
+Mock test mode enforces timer and produces rubric breakdown + heatmap.
+
+
+Flashcards spaced repetition works (SM-2 fields update).
+
+
+Placement mode returns a company profile (real if API, else mock) and coding round with Judge0 (or mocked).
+
+
+Agent Console streams agent loop (plan/actions/reflections).
+
+
+README includes setup, env, demo flow, screenshots.
