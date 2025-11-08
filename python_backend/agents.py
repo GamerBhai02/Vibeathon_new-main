@@ -2,6 +2,7 @@
 
 import os
 import re
+import json  # ✅ ADD THIS LINE - WAS MISSING!
 from sqlmodel import Session, select
 import google.generativeai as genai
 from .rag import RAGSystem
@@ -72,9 +73,7 @@ def parse_llm_output(text: str) -> list | dict:
         return json.loads(text)
     except json.JSONDecodeError:
         # If it fails, try to find the JSON block within the text
-        match = re.search(r"```json
-(.*)
-```", text, re.DOTALL)
+        match = re.search(r"```json\n(.*)\n```", text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(1))
@@ -113,7 +112,7 @@ class FlashcardAgent:
     ) -> list[Flashcard]:
         """Generates flashcards from a source (e.g., a Topic)."""
         if source_type == "topic":
-            topic = db_session.get(Topic, int(source_id))
+            topic = db_session.get(Topic, source_id)
             if not topic:
                 raise ValueError("Topic not found")
             source_text = topic.summary
@@ -132,7 +131,7 @@ class FlashcardAgent:
             flashcard = Flashcard(
                 front=data["front"],
                 back=data["back"],
-                topicId=int(source_id),
+                topicId=source_id,
                 userId=user_id,
             )
             db_session.add(flashcard)
