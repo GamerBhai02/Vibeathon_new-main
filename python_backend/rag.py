@@ -7,10 +7,15 @@ try:
     import chromadb
     from chromadb.utils import embedding_functions
     CHROMADB_AVAILABLE = True
+    RAG_AVAILABLE = True  # Alias for compatibility
 except ImportError:
     CHROMADB_AVAILABLE = False
+    RAG_AVAILABLE = False  # Alias for compatibility
     print("Warning: chromadb and sentence-transformers not available. RAG features disabled.")
     print("To enable RAG features, install with: pip install -r requirements-full.txt")
+
+# Export for use in other modules
+__all__ = ['RAGSystem', 'CHROMADB_AVAILABLE', 'RAG_AVAILABLE']
 
 # --- Configuration ---
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
