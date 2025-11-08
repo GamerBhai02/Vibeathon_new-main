@@ -31,13 +31,13 @@ def validate_environment() -> Dict[str, List[str]]:
     
     # Optional environment variables with defaults
     optional_vars = [
-        ("DATABASE_URL", False, "sqlite:///./test.db"),
+        ("DATABASE_URL", False, "sqlite:///./agentverse.db"),
         ("CHROMA_DB_PATH", False, "./chroma_db"),
         ("CORS_ORIGINS", False, "http://localhost:3000,http://localhost:5173"),
+        ("JWT_SECRET", False, "dev-secret-change-in-production"),
         ("JUDGE0_API_URL", False, None),
         ("JUDGE0_API_KEY", False, None),
         ("YOUTUBE_API_KEY", False, None),
-        ("ANTHROPIC_API_KEY", False, None),
     ]
     
     print("=" * 60)
@@ -95,10 +95,13 @@ def print_setup_instructions():
     print("   JUDGE0_API_KEY=your_judge0_api_key_here  # Optional")
     print()
     print("3. Configure database (optional):")
-    print("   DATABASE_URL=sqlite:///./test.db")
+    print("   DATABASE_URL=sqlite:///./agentverse.db")
     print("   CHROMA_DB_PATH=./chroma_db")
     print()
-    print("4. Configure CORS (optional):")
+    print("4. Configure JWT secret (recommended for production):")
+    print("   JWT_SECRET=your-secret-jwt-key-change-in-production")
+    print()
+    print("5. Configure CORS (optional):")
     print("   CORS_ORIGINS=http://localhost:3000,http://localhost:5173")
     print("-" * 60)
 

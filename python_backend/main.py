@@ -48,6 +48,15 @@ def get_current_user():
 
 # --- API Endpoints ---
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for deployment verification."""
+    return {
+        "status": "healthy",
+        "service": "vibeathon-python-backend",
+        "version": "1.0.0"
+    }
+
 @app.post("/topics/generate")
 async def generate_new_topic(
     prompt: str = Body(..., embed=True),
