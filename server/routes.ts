@@ -41,6 +41,16 @@ function authenticateToken(req: any, res: any, next: any) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({
+      status: "healthy",
+      service: "vibeathon-nodejs-backend",
+      version: "1.0.0",
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Auth routes
   app.post("/api/auth/login", async (req, res) => {
     try {

@@ -1,3 +1,4 @@
 #!/bin/bash
 cd "$(dirname "$0")"
-uvicorn python_backend.main:app --host 0.0.0.0 --port 5000 --reload
+PORT=${PORT:-8001}
+uvicorn python_backend.main:app --host 0.0.0.0 --port $PORT --reload

@@ -1,11 +1,10 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlmodel
 httpx
 python-dotenv
 chromadb
 sentence-transformers
-anthropic
 google-api-python-client
 google-generativeai
 pydantic-settings
@@ -16,3 +15,4 @@ python-magic
 pillow
 websockets
 python-multipart
+python-jose[cryptography]

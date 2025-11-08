@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # AI Model APIs
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "AIzaSyB7leC6LVpjdkSlUzpSkW9zVjl1oO4R5gw")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     
     # External services
