@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BookOpen, ExternalLink, Lightbulb, AlertTriangle, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { BookOpen, ExternalLink, Lightbulb, AlertTriangle, AlertCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,53 +10,74 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import type { Topic } from "@shared/schema";
 
+interface LessonContent {
+  title: string;
+  sections: Array<{ heading: string; content: string }>;
+  commonMistakes: string[];
+  tips?: string[];
+  citations: string[];
+  confidence: "High" | "Medium" | "Low";
+}
+
 export default function Learn() {
   const [selectedTopic, setSelectedTopic] = useState<string>("");
+  const [lessonContent, setLessonContent] = useState<LessonContent | null>(null);
 
   const { data: topics = [], isLoading, error } = useQuery<Topic[]>({
     queryKey: ["/api/topics"],
   });
 
-  const currentTopic = topics.find((t) => t.id === selectedTopic);
+  const generateLessonMutation = useMutation({
+    mutationFn: async (topicId: string) => {
+      const response = await fetch('/api/learn/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ topicId })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate lesson');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setLessonContent(data);
+    },
+    onError: (error) => {
+      console.error('Failed to generate lesson:', error);
+      // Set fallback content
+      const topic = topics.find(t => t.id === selectedTopic);
+      if (topic) {
+        setLessonContent({
+          title: `Understanding ${topic.name}`,
+          sections: [
+            {
+              heading: topic.name,
+              content: topic.summary || "Content is being processed. Please check back later.",
+            },
+          ],
+          commonMistakes: [],
+          tips: ["Review the material regularly"],
+          citations: [],
+          confidence: "Medium",
+        });
+      }
+    }
+  });
 
-  // Use the topic summary if available
-  const lesson = currentTopic?.summary ? {
-    title: `Understanding ${currentTopic.name}`,
-    sections: [
-      {
-        heading: currentTopic.name,
-        content: currentTopic.summary,
-      },
-    ],
-    commonMistakes: [],
-    citations: [],
-    confidence: "High" as const,
-  } : {
-    title: "Understanding Database Normalization",
-    sections: [
-      {
-        heading: "What is Normalization?",
-        content:
-          "Database normalization is the process of organizing data to minimize redundancy and improve data integrity. It involves dividing large tables into smaller ones and defining relationships between them.",
-      },
-      {
-        heading: "First Normal Form (1F)",
-        content:
-          "A table is in 1NF if it contains only atomic values (no repeating groups) and each column contains values of a single type.",
-      },
-      {
-        heading: "Second Normal Form (2NF)",
-        content:
-          "A table is in 2NF if it's in 1NF and all non-key attributes are fully dependent on the primary key.",
-      },
-    ],
-    commonMistakes: [
-      "Confusing partial dependency with transitive dependency",
-      "Not identifying all candidate keys before normalizing",
-    ],
-    citations: ["Database Systems Textbook - Chapter 7", "PYQ_2023_Q4.pdf"],
-    confidence: "High" as const,
-  };
+  // Generate lesson when topic is selected
+  useEffect(() => {
+    if (selectedTopic) {
+      setLessonContent(null); // Clear previous content
+      generateLessonMutation.mutate(selectedTopic);
+    }
+  }, [selectedTopic]);
+
+  const currentTopic = topics.find((t) => t.id === selectedTopic);
 
   if (error) {
     return (
@@ -131,80 +152,95 @@ export default function Learn() {
 
       {currentTopic ? (
         <div className="space-y-6">
-          <Card data-testid="card-lesson">
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle>{lesson.title}</CardTitle>
-                  <CardDescription>Topic: {currentTopic.name}</CardDescription>
+          {generateLessonMutation.isPending ? (
+            <Card data-testid="card-lesson">
+              <CardContent className="py-12 text-center">
+                <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Generating lesson content with AI...
+                </p>
+              </CardContent>
+            </Card>
+          ) : lessonContent ? (
+            <Card data-testid="card-lesson">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <CardTitle>{lessonContent.title}</CardTitle>
+                    <CardDescription>Topic: {currentTopic.name}</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={lessonContent.confidence === "High" ? "default" : "secondary"}>
+                      {lessonContent.confidence} Confidence
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={lesson.confidence === "High" ? "default" : "secondary"}>
-                    {lesson.confidence} Confidence
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {lesson.sections.map((section, idx) => (
-                <div key={idx} className="space-y-3">
-                  <h3 className="text-lg font-semibold">{section.heading}</h3>
-                  <p className="leading-relaxed text-card-foreground">
-                    {section.content}
-                  </p>
-                  {idx < lesson.sections.length - 1 && <Separator className="mt-4" />}
-                </div>
-              ))}
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {lessonContent.sections.map((section, idx) => (
+                  <div key={idx} className="space-y-3">
+                    <h3 className="text-lg font-semibold">{section.heading}</h3>
+                    <p className="leading-relaxed text-card-foreground whitespace-pre-wrap">
+                      {section.content}
+                    </p>
+                    {idx < lessonContent.sections.length - 1 && <Separator className="mt-4" />}
+                  </div>
+                ))}
 
-              {lesson.commonMistakes.length > 0 && (
-                <div className="mt-8 rounded-md bg-muted p-6">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-destructive" />
-                    <div>
-                      <h4 className="font-medium">Common Mistakes</h4>
-                      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                        {lesson.commonMistakes.map((mistake, idx) => (
-                          <li key={idx}>• {mistake}</li>
-                        ))}
-                      </ul>
+                {lessonContent.commonMistakes.length > 0 && (
+                  <div className="mt-8 rounded-md bg-muted p-6">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                      <div>
+                        <h4 className="font-medium">Common Mistakes</h4>
+                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                          {lessonContent.commonMistakes.map((mistake, idx) => (
+                            <li key={idx}>• {mistake}</li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <div className="mt-6 rounded-md border p-4">
-                <div className="flex items-start gap-3">
-                  <Lightbulb className="h-5 w-5 text-primary" />
-                  <div>
-                    <h4 className="text-sm font-medium">Pro Tip</h4>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Practice with real examples from PYQs to solidify your understanding
-                    </p>
+                {lessonContent.tips && lessonContent.tips.length > 0 && (
+                  <div className="mt-6 rounded-md border p-4">
+                    <div className="flex items-start gap-3">
+                      <Lightbulb className="h-5 w-5 text-primary" />
+                      <div>
+                        <h4 className="text-sm font-medium">Pro Tips</h4>
+                        <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+                          {lessonContent.tips.map((tip, idx) => (
+                            <li key={idx}>• {tip}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {lesson.citations.length > 0 && (
-                <div className="mt-6">
-                  <h4 className="mb-3 text-sm font-medium text-muted-foreground">
-                    Sources
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {lesson.citations.map((citation, idx) => (
-                      <Badge
-                        key={idx}
-                        variant="outline"
-                        className="gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        {citation}
-                      </Badge>
-                    ))}
+                {lessonContent.citations.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="mb-3 text-sm font-medium text-muted-foreground">
+                      Sources
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {lessonContent.citations.map((citation, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="outline"
+                          className="gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {citation}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <div className="flex gap-4">
             <Button variant="outline" className="flex-1" data-testid="button-practice">
