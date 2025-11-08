@@ -1,8 +1,16 @@
 """Rudimentary RAG system using ChromaDB for document retrieval."""
 
-import chromadb
-from chromadb.utils import embedding_functions
 import os
+
+# Optional imports - gracefully handle missing dependencies
+try:
+    import chromadb
+    from chromadb.utils import embedding_functions
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    CHROMADB_AVAILABLE = False
+    print("Warning: chromadb and sentence-transformers not available. RAG features disabled.")
+    print("To enable RAG features, install with: pip install -r requirements-full.txt")
 
 # --- Configuration ---
 CHROMA_DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
@@ -15,6 +23,9 @@ _sentence_transformer_ef = None
 
 def get_client():
     """Lazy initialization of ChromaDB client."""
+    if not CHROMADB_AVAILABLE:
+        raise RuntimeError("ChromaDB is not available. Install with: pip install -r requirements-full.txt")
+    
     global _client
     if _client is None:
         _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
@@ -22,6 +33,9 @@ def get_client():
 
 def get_embedding_function():
     """Lazy initialization of embedding function."""
+    if not CHROMADB_AVAILABLE:
+        raise RuntimeError("ChromaDB is not available. Install with: pip install -r requirements-full.txt")
+    
     global _sentence_transformer_ef
     if _sentence_transformer_ef is None:
         # Using a sentence-transformer model for embeddings
@@ -36,6 +50,9 @@ class RAGSystem:
 
     def __init__(self, user_id: str):
         """Initializes the RAG system for a given user."""
+        if not CHROMADB_AVAILABLE:
+            raise RuntimeError("RAG features require chromadb and sentence-transformers. Install with: pip install -r requirements-full.txt")
+        
         self.user_id = user_id
         self.collection_name = f"user_{user_id}_documents"
         self.collection = None  # Lazy-loaded

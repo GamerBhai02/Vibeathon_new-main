@@ -4,7 +4,10 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "poppler_utils", "tcl", "tesseract", "tk", "zlib"]
+# Removed heavy packages: freetype, lcms2, libimagequant, libjpeg, libtiff, 
+# libwebp, libxcrypt, openjpeg, poppler_utils, tcl, tesseract, tk, zlib
+# Uncomment these if you need document processing features
+# packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "poppler_utils", "tcl", "tesseract", "tk", "zlib"]
 
 [deployment]
 deploymentTarget = "autoscale"
