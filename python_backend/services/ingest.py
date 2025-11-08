@@ -36,8 +36,8 @@ from ..models import Document, Topic
 
 # Only import RAG if chromadb is available
 try:
-    from ..rag import RAGSystem
-    RAG_AVAILABLE = True
+    from ..rag import RAGSystem, RAG_AVAILABLE as RAG_MODULE_AVAILABLE
+    RAG_AVAILABLE = RAG_MODULE_AVAILABLE
 except ImportError:
     RAG_AVAILABLE = False
 
