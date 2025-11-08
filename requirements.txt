@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlmodel
+httpx
+python-dotenv
+chromadb
+sentence-transformers
+anthropic
+google-api-python-client
+pydantic-settings
+sqlalchemy

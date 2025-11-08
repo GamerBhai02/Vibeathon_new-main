@@ -1,111 +1,88 @@
-"""QuizGenAgent - Generates practice questions and mock exams"""
-from .base import BaseAgent
-from typing import List, Dict, Any
+"""Agent for generating quizzes and mock exams"""
+
+from ..services.anthropic import call_anthropic_api
+from ..rag import RAGSystem
 import json
+from typing import List
 
+class QuizGenAgent:
+    """Generates practice questions, quizzes, and mock exams."""
 
-class QuizGenAgent(BaseAgent):
-    """Autonomous agent that creates quizzes and exams"""
-    
-    def __init__(self):
-        super().__init__("QuizGenAgent")
-    
-    async def generate_questions(
-        self,
-        topic_name: str,
-        difficulty: str,
-        count: int,
-        user_id: str,
-    ) -> List[Dict[str, Any]]:
-        """Generate practice questions"""
-        
-        prompt = f"""
-        Generate {count} {difficulty} difficulty practice questions on: {topic_name}
-        
-        For each question provide:
-        - question: The question text
-        - hint: A subtle hint without giving away the answer
-        - steps: Array of 3-5 progressive steps toward solution
-        - fullSolution: Complete detailed solution
-        - rubric: Grading criteria
-        - difficulty: {difficulty}
-        - confidence: Your confidence level (High/Medium/Low)
-        
-        Format as JSON array.
+    async def generate_questions(self, topic_name: str, difficulty: str, count: int, user_id: str) -> List[dict]:
+        """Generates a list of practice questions on a given topic."""
+
+        rag = RAGSystem(user_id)
+        retrieved_docs = await rag.query(f"Content related to {topic_name} for a {difficulty} quiz")
+
+        system_prompt = """
+        You are a quiz generation AI. Your task is to create a set of practice questions on a given topic, at a specified difficulty level. The questions should be in a multiple-choice format.
+
+        The output must be a valid JSON list of objects, where each object represents a question and has the following structure:
+        - "question": The text of the question.
+        - "options": A list of 4 strings representing the possible answers.
+        - "correct_answer": The string that is the correct answer.
+        - "explanation": A brief explanation of why the correct answer is right.
+
+        Use the provided context from the user's documents to create relevant questions.
         """
+
+        user_prompt = f"""
+        Topic: {topic_name}
+        Difficulty: {difficulty}
+        Number of questions: {count}
+        Context from user's documents:
+        --- 
+        {retrieved_docs}
+        ---
+        """
+
+        response = await call_anthropic_api(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=2000,
+        )
+
+        return json.loads(response)
+
+    async def generate_mock_exam(self, exam_type: str, duration: int, total_marks: int, topics: List[str], user_id: str) -> dict:
+        """Generates a comprehensive mock exam based on a set of topics."""
         
-        thought = await self.think(f"Generating {count} questions for {topic_name}")
-        result = await self.act(prompt)
-        
-        # Parse or use mock
-        try:
-            if self.llm:
-                questions = json.loads(result["result"])
-            else:
-                # Mock questions
-                questions = [
-                    {
-                        "question": f"{difficulty.capitalize()} question {i+1} about {topic_name}",
-                        "hint": f"Think about the key principles of {topic_name}",
-                        "steps": [
-                            "Identify the key concepts",
-                            "Apply the formula or method",
-                            "Verify your answer",
-                        ],
-                        "fullSolution": f"Detailed solution for question {i+1}",
-                        "rubric": "5 points for approach, 3 for execution, 2 for explanation",
-                        "difficulty": difficulty,
-                        "citations": [f"Textbook Chapter {i+1}"],
-                        "confidence": "High",
-                    }
-                    for i in range(count)
-                ]
-        except json.JSONDecodeError:
-            # Fallback
-            questions = []
-        
-        await self.reflect(f"Generated {len(questions)} questions")
-        
-        return questions
-    
-    async def generate_mock_exam(
-        self,
-        exam_type: str,
-        duration: int,
-        total_marks: int,
-        topics: List[str],
-        user_id: str,
-    ) -> Dict[str, Any]:
-        """Generate full mock exam"""
-        
-        # Distribute marks across topics
-        marks_per_topic = total_marks // len(topics) if topics else total_marks
-        
-        questions = []
-        question_id = 1
-        
-        for topic_id in topics:
-            # Generate 2-3 questions per topic
-            for i in range(2):
-                marks = marks_per_topic // 2
-                questions.append({
-                    "id": f"q{question_id}",
-                    "question": f"Question {question_id} on topic {topic_id}",
-                    "marks": marks,
-                    "rubric": f"{marks} marks for complete answer",
-                    "topicId": topic_id,
-                })
-                question_id += 1
-        
-        return {
-            "title": f"{exam_type} Mock Exam",
-            "questions": questions,
-            "instructions": f"Answer all questions. Time limit: {duration} minutes. Total marks: {total_marks}.",
-        }
-    
-    async def run(self, **kwargs) -> Dict[str, Any]:
-        """Run quiz generation"""
-        if "exam_type" in kwargs:
-            return await self.generate_mock_exam(**kwargs)
-        else:
-            return await self.generate_questions(**kwargs)
+        rag = RAGSystem(user_id)
+        context = ""
+        for topic in topics:
+            context += await rag.query(f"Content for a mock exam on {topic}") + "\n\n"
+
+        system_prompt = """
+        You are an expert exam creator. Your task is to generate a realistic mock exam based on a list of topics, duration, and total marks. The exam should have a mix of question types (e.g., multiple-choice, short answer) and cover the provided topics proportionally.
+
+        The output must be a valid JSON object with the following structure:
+        - "title": A suitable title for the mock exam.
+        - "instructions": A list of instructions for the test-taker.
+        - "questions": A list of question objects. Each question object should have:
+            - "type": The type of question (e.g., "multiple-choice", "short-answer").
+            - "question": The question text.
+            - "options": A list of options (for multiple-choice questions).
+            - "marks": The number of marks allocated to the question.
+            - "topic": The topic the question relates to.
+
+        Use the provided context from the user's documents to create relevant questions.
+        """
+
+        user_prompt = f"""
+        Exam Type: {exam_type}
+        Duration (minutes): {duration}
+        Total Marks: {total_marks}
+        Topics: {', '.join(topics)}
+        Context from user's documents:
+        ---
+        {context}
+        ---
+        """
+
+        response = await call_anthropic_api(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=4000,
+        )
+
+        return json.loads(response)

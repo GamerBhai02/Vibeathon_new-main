@@ -1,23 +1,14 @@
-"""Database setup and session management"""
-from sqlmodel import SQLModel, Session, create_engine
+"""Database connection and session management."""
 
-# Force SQLite (ignore environment DATABASE_URL)
-DATABASE_URL = "sqlite:///./agentverse.db"
+from sqlmodel import create_engine, Session
+import os
 
-# Create SQLite engine
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False,
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-
-def create_db_and_tables():
-    """Create all database tables"""
-    SQLModel.metadata.create_all(engine)
-
+# The connect_args is for SQLite only
+engine = create_engine(DATABASE_URL, echo=True, connect_args={"check_same_thread": False})
 
 def get_session():
-    """Get database session dependency"""
+    """Provides a database session."""
     with Session(engine) as session:
         yield session

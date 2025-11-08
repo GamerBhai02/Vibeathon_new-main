@@ -1,95 +1,43 @@
-"""EvaluatorAgent - Grades submissions with rubric alignment"""
-from .base import BaseAgent
-from typing import List, Dict, Any
+"""Agent for evaluating user submissions and providing feedback"""
+
+from ..services.anthropic import call_anthropic_api
 import json
+from typing import List
 
+class EvaluatorAgent:
+    """Grades student answers and provides constructive feedback."""
 
-class EvaluatorAgent(BaseAgent):
-    """Autonomous agent that grades answers and provides feedback"""
-    
-    def __init__(self):
-        super().__init__("EvaluatorAgent")
-    
-    async def grade_submission(
-        self,
-        questions: List[Dict[str, Any]],
-        answers: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
-        """Grade exam submission with detailed feedback"""
+    async def grade_submission(self, questions: List[dict], answers: List[dict]) -> dict:
+        """Grades a set of answers against the original questions."""
+
+        system_prompt = """
+        You are an AI evaluator. Your task is to grade a student's submission for a test. You will be given the original questions and the student's answers. You need to assess each answer, calculate a total score, and provide feedback.
+
+        The output must be a valid JSON object with the following structure:
+        - "score": The total score achieved by the student.
+        - "topicBreakdown": A dictionary where keys are topics and values are the scores for that topic.
+        - "answers": A list of objects, each corresponding to an answer. Each object should have:
+            - "question": The original question text.
+            - "submitted_answer": The answer submitted by the student.
+            - "is_correct": A boolean indicating if the answer is correct.
+            - "feedback": Constructive feedback on the answer, explaining why it is right or wrong.
+            - "marks_awarded": The marks awarded for the answer.
+
+        For multiple-choice questions, the answer is either right or wrong. For short-answer questions, you may need to assess the content and award partial marks if appropriate.
+        """
         
-        total_marks = sum(q["marks"] for q in questions)
-        graded_answers = []
-        topic_breakdown = {}
-        
-        for i, answer in enumerate(answers):
-            question = next((q for q in questions if q["id"] == answer["questionId"]), None)
-            if not question:
-                continue
-            
-            # Grade using LLM with rubric
-            prompt = f"""
-            Grade this answer against the rubric:
-            
-            Question: {question["question"]}
-            Rubric: {question["rubric"]}
-            Student Answer: {answer.get("answer", "")}
-            Max Marks: {question["marks"]}
-            
-            Provide:
-            1. Marks awarded (0 to {question["marks"]})
-            2. Detailed feedback on strengths and improvements
-            
-            Format as JSON: {{"marksAwarded": X, "feedback": "..."}}
-            """
-            
-            result = await self.act(prompt)
-            
-            try:
-                if self.llm:
-                    grading = json.loads(result["result"])
-                else:
-                    # Mock grading
-                    answer_length = len(answer.get("answer", ""))
-                    if answer_length > 100:
-                        marks_awarded = int(question["marks"] * 0.8)
-                        feedback = "Good comprehensive answer"
-                    elif answer_length > 20:
-                        marks_awarded = int(question["marks"] * 0.5)
-                        feedback = "Adequate but could be more detailed"
-                    else:
-                        marks_awarded = int(question["marks"] * 0.2)
-                        feedback = "Answer needs more depth and examples"
-            except json.JSONDecodeError:
-                grading = {
-                    "marksAwarded": question["marks"] // 2,
-                    "feedback": "Answer partially addresses the question",
-                }
-            
-            graded_answers.append({
-                "questionId": answer["questionId"],
-                "answer": answer.get("answer", ""),
-                "marksAwarded": grading["marksAwarded"],
-                "feedback": grading["feedback"],
-            })
-            
-            # Track topic performance
-            topic_id = question.get("topicId", "unknown")
-            if topic_id not in topic_breakdown:
-                topic_breakdown[topic_id] = {"earned": 0, "possible": 0}
-            topic_breakdown[topic_id]["earned"] += grading["marksAwarded"]
-            topic_breakdown[topic_id]["possible"] += question["marks"]
-        
-        total_earned = sum(a["marksAwarded"] for a in graded_answers)
-        score = int((total_earned / total_marks) * 100) if total_marks > 0 else 0
-        
-        await self.reflect(f"Graded submission: {score}% ({total_earned}/{total_marks})")
-        
-        return {
-            "score": score,
-            "answers": graded_answers,
-            "topicBreakdown": topic_breakdown,
-        }
-    
-    async def run(self, **kwargs) -> Dict[str, Any]:
-        """Run evaluator agent"""
-        return await self.grade_submission(**kwargs)
+        user_prompt = f"""
+        Questions:
+        {json.dumps(questions)}
+
+        Student's Answers:
+        {json.dumps(answers)}
+        """
+
+        response = await call_anthropic_api(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=3000,
+        )
+
+        return json.loads(response)

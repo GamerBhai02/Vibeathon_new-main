@@ -1,96 +1,43 @@
-"""TeacherAgent - Generates RAG-powered micro-lessons"""
-from .base import BaseAgent
-from typing import Dict, Any
+"""Agent for generating lessons and explanations"""
+
+from ..services.anthropic import call_anthropic_api
+from ..rag import RAGSystem
 import json
 
+class TeacherAgent:
+    """Generates micro-lessons and explanations with RAG integration."""
 
-class TeacherAgent(BaseAgent):
-    """Autonomous agent that creates micro-lessons with citations"""
-    
-    def __init__(self):
-        super().__init__("TeacherAgent")
-    
-    async def generate_lesson(
-        self,
-        topic_name: str,
-        user_id: str,
-    ) -> Dict[str, Any]:
-        """Generate micro-lesson with RAG-backed content"""
-        from ..rag import RAGSystem
-        
-        # Initialize RAG system
+    async def generate_lesson(self, topic_name: str, user_id: str) -> dict:
+        """Creates a concise, engaging micro-lesson on a specific topic."""
+
         rag = RAGSystem(user_id)
-        
-        # Search for relevant context
-        relevant_docs = await rag.search(topic_name, k=5)
-        
-        # Build context from retrieved documents
-        context = "\n\n".join([
-            f"[Source: {doc['source']}]\n{doc['content']}"
-            for doc in relevant_docs
-        ])
-        
-        # Generate lesson with LLM
-        prompt = f"""
-        Create a comprehensive micro-lesson on: {topic_name}
-        
-        Use the following source materials as reference:
-        {context}
-        
-        Structure the lesson as:
-        1. Overview (2-3 sentences)
-        2. Key Concepts (3-5 bullet points)
-        3. Step-by-step explanation
-        4. Common pitfalls to avoid
-        5. Practice tip
-        
-        Include citations to the source materials.
-        Format as JSON with fields: overview, concepts, steps, pitfalls, practiceTip, citations
+        retrieved_docs = await rag.query(f"Content related to {topic_name}")
+
+        system_prompt = """
+        You are an expert teacher AI. Your goal is to create a high-quality, engaging micro-lesson on a specific topic. The lesson should be clear, concise, and easy to understand for a student who is learning this for the first time.
+
+        Structure the lesson as a JSON object with the following keys:
+        - "title": The title of the lesson (e.g., "Introduction to Photosynthesis").
+        - "key_concepts": A list of the most important concepts or terms covered in the lesson.
+        - "explanation": A detailed but clear explanation of the topic. Use analogies and simple examples where possible.
+        - "example": A practical example or a worked-through problem to illustrate the concept.
+        - "summary": A brief summary of the main points of the lesson.
+
+        Use the provided context from the user's documents to make the lesson more relevant.
         """
-        
-        thought = await self.think(f"Generating lesson for {topic_name}")
-        result = await self.act(prompt)
-        
-        # Parse LLM response or use structured fallback
-        try:
-            if self.llm:
-                lesson = json.loads(result["result"])
-            else:
-                # Mock lesson for development
-                lesson = {
-                    "overview": f"This lesson covers {topic_name} in detail.",
-                    "concepts": [
-                        f"Core concept 1 of {topic_name}",
-                        f"Core concept 2 of {topic_name}",
-                        f"Core concept 3 of {topic_name}",
-                    ],
-                    "steps": [
-                        f"Step 1: Understand the basics of {topic_name}",
-                        f"Step 2: Practice with examples",
-                        f"Step 3: Apply to real problems",
-                    ],
-                    "pitfalls": [
-                        "Common mistake 1",
-                        "Common mistake 2",
-                    ],
-                    "practiceTip": f"Practice {topic_name} daily for best results",
-                    "citations": [doc["source"] for doc in relevant_docs],
-                }
-        except json.JSONDecodeError:
-            # Fallback if JSON parsing fails
-            lesson = {
-                "overview": f"Lesson on {topic_name}",
-                "concepts": ["Concept 1", "Concept 2"],
-                "steps": ["Step 1", "Step 2"],
-                "pitfalls": ["Avoid this"],
-                "practiceTip": "Practice regularly",
-                "citations": [],
-            }
-        
-        reflection = await self.reflect("Lesson generated successfully")
-        
-        return lesson
-    
-    async def run(self, **kwargs) -> Dict[str, Any]:
-        """Run the teacher agent"""
-        return await self.generate_lesson(**kwargs)
+
+        user_prompt = f"""
+        Topic: {topic_name}
+        Context from user's documents:
+        --- 
+        {retrieved_docs}
+        ---        
+        """
+
+        response = await call_anthropic_api(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=1500,
+        )
+
+        return json.loads(response)
