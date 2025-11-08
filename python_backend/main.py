@@ -1,18 +1,22 @@
 """Main FastAPI application."""
 
-from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from typing import List
+import tempfile
+import os
+from pathlib import Path
 
-from .database import get_session
-from .models import User, Topic, Flashcard, Quiz, QuizQuestion
+from .database import get_session, engine
+from .models import User, Topic, Flashcard, Quiz, QuizQuestion, Document
 from .enums import TopicStatus, QuizDifficulty, QuizType
 from .agents import TopicGenerator, FlashcardAgent, QuizGen, EvaluatorAgent
 from .services import (
     update_flashcard_sm2, 
     search_youtube,
     execute_code_judge0,
+    process_document,
 )
 
 app = FastAPI()
@@ -169,9 +173,60 @@ async def youtube_search(query: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error searching YouTube: {e}")
 
-# --- Main App Entry Point (for `uvicorn main:app`) ---
+@app.post("/ingest")
+async def ingest_document(
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Uploads and processes a document (PDF, image, or text file) for OCR and topic extraction."""
+    try:
+        # Create a temporary file to store the upload
+        suffix = Path(file.filename).suffix
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            # Write uploaded file to temporary file
+            content = await file.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Process the document (OCR, topic extraction, RAG indexing)
+            topics = await process_document(
+                file_path=tmp_file_path,
+                user_id=str(current_user.id),
+                session=session,
+            )
+            
+            # Create a Document record
+            document = Document(
+                userId=current_user.id,
+                filename=file.filename,
+                contentType=file.content_type or "application/octet-stream",
+                extractedText="",  # Could be populated with full text if needed
+                vectorIds=[],  # Could be populated with ChromaDB IDs
+            )
+            session.add(document)
+            session.commit()
+            session.refresh(document)
+            
+            return {
+                "message": "Document processed successfully",
+                "document_id": document.id,
+                "topics_extracted": len(topics),
+                "topics": [{"id": t.id, "name": t.name} for t in topics]
+            }
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing document: {str(e)}"
+        )
 
-from .database import engine
+# --- Database Initialization ---
 
 def create_db_and_tables():
     from sqlmodel import SQLModel

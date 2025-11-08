@@ -1,6 +1,13 @@
 """Agent for generating study plans"""
-from ..services.anthropic import call_anthropic_api
+import os
 import json
+import re
+import google.generativeai as genai
+
+# Configure Gemini API
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 class PlannerAgent:
     """Generates personalized study plans."""
@@ -8,7 +15,16 @@ class PlannerAgent:
     async def generate_plan(self, topics: list, exam_type: str, exam_date: str, hours_per_day: int) -> dict:
         """Creates a structured study plan."""
         
-        system_prompt = """
+        if not GEMINI_API_KEY:
+            # Return a mock plan if no API key
+            return {
+                "startDate": "2024-01-01",
+                "endDate": exam_date,
+                "weeklyGoal": "Complete study plan",
+                "blocks": []
+            }
+        
+        prompt = f"""
         You are an expert study planner. Your task is to create a detailed, personalized study plan based on a list of topics, an exam type, an exam date, and the user's available study time.
 
         The output must be a valid JSON object with the following structure:
@@ -23,19 +39,23 @@ class PlannerAgent:
             - "activities": A list of suggested activities for the block (e.g., "Review notes", "Practice problems", "Watch a video lecture").
 
         Analyze the topics and create a logical sequence. Allocate more time to more complex topics if possible. Distribute the study sessions across the available days.
-        """
-
-        user_prompt = f"""
+        
         Topics: {', '.join([t.name for t in topics])}
         Exam Type: {exam_type}
         Exam Date: {exam_date}
         Available study time: {hours_per_day} hours per day
+        
+        Respond with ONLY the JSON object, no additional text or markdown formatting.
         """
 
-        response = await call_anthropic_api(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            max_tokens=2000,
-        )
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = await model.generate_content_async(prompt)
         
-        return json.loads(response)
+        # Clean the response to extract JSON
+        response_text = response.text.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:-3].strip()
+        elif response_text.startswith("```"):
+            response_text = response_text[3:-3].strip()
+        
+        return json.loads(response_text)

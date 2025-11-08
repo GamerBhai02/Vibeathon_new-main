@@ -1,16 +1,23 @@
 """Agent Orchestrator to coordinate all other agents"""
 
 import asyncio
+import os
 import json
+import re
 from typing import AsyncGenerator
 
 from pydantic import BaseModel
+import google.generativeai as genai
 
-from ..services.anthropic import call_anthropic_api
 from .evaluator import EvaluatorAgent
 from .planner import PlannerAgent
 from .quizgen import QuizGenAgent
 from .teacher import TeacherAgent
+
+# Configure Gemini API
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 class AgentEvent(BaseModel):
@@ -34,8 +41,15 @@ class AgentOrchestrator:
         """Decompose goal and execute tasks with agents"""
         yield AgentEvent(type="thought", data={"text": "Interpreting your goal..."})
 
+        if not GEMINI_API_KEY:
+            yield AgentEvent(
+                type="error",
+                data={"text": "GEMINI_API_KEY not configured. Cannot orchestrate agents."},
+            )
+            return
+
         # Use a powerful model to interpret the goal into a plan
-        system_prompt = """
+        prompt = """
         You are an AI orchestrator. Your job is to interpret a user's goal and break it down into a series of tasks for other AI agents.
         You have the following agents available:
         - planner: Creates a study plan.
@@ -55,15 +69,24 @@ class AgentOrchestrator:
         [{"agent": "teacher", "action": "generate_lesson", "params": {"topic": "photosynthesis"}}]
         Goal: "Quiz me on Python data structures, medium difficulty"
         [{"agent": "quizgen", "action": "generate_questions", "params": {"topic": "Python data structures", "difficulty": "medium", "count": 5}}]
+        
+        User's Goal: """ + goal + """
+        
+        Respond with ONLY the JSON array, no additional text or markdown formatting.
         """
 
         try:
-            llm_response = await call_anthropic_api(
-                system_prompt=system_prompt,
-                user_prompt=goal,
-                max_tokens=500,
-            )
-            plan = json.loads(llm_response)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = await model.generate_content_async(prompt)
+            
+            # Clean the response to extract JSON
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:-3].strip()
+            elif response_text.startswith("```"):
+                response_text = response_text[3:-3].strip()
+            
+            plan = json.loads(response_text)
         except Exception as e:
             yield AgentEvent(
                 type="error",

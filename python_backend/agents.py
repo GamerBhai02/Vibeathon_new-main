@@ -2,16 +2,11 @@
 
 import os
 import re
+import json
 from sqlmodel import Session, select
 import google.generativeai as genai
 from .rag import RAGSystem
 from .models import Flashcard, Topic
-from .prompts import (
-    flashcard_prompt,
-    quiz_prompt,
-    topic_prompt,
-    evaluator_prompt,
-)
 
 # --- Configuration ---
 try:
@@ -63,6 +58,73 @@ def get_llm():
     if MODEL_NAME == "mock":
         return MockLLM()
     return GeminiLLM()
+
+# --- Prompt Templates ---
+topic_prompt = """
+You are an expert educational AI assistant. Based on the user's prompt and the retrieved context, generate a learning topic.
+
+User Prompt: {user_prompt}
+
+Retrieved Context:
+{retrieved_context}
+
+Generate a JSON object with the following structure:
+{{
+  "name": "Topic Name",
+  "summary": "A concise summary of the topic (2-3 sentences)",
+  "subtopics": ["subtopic1", "subtopic2", "subtopic3"]
+}}
+
+Respond with ONLY the JSON object, no additional text.
+"""
+
+flashcard_prompt = """
+You are an expert flashcard creator. Generate {number_of_flashcards} flashcards from the following content:
+
+{source_text}
+
+Create flashcards that test key concepts, definitions, and important facts.
+Generate a JSON array of flashcard objects with the following structure:
+[
+  {{"front": "Question or prompt", "back": "Answer or explanation"}},
+  {{"front": "Question or prompt", "back": "Answer or explanation"}}
+]
+
+Respond with ONLY the JSON array, no additional text.
+"""
+
+quiz_prompt = """
+You are an expert quiz creator. Generate a quiz with the following specifications:
+
+Topic Summary: {topic_summary}
+Difficulty: {difficulty}
+Quiz Type: {quiz_type}
+Number of Questions: {num_questions}
+
+Generate a JSON array of question objects with the following structure:
+[
+  {{"question_text": "Question text here", "answer": "Correct answer"}},
+  {{"question_text": "Question text here", "answer": "Correct answer"}}
+]
+
+For multiple choice questions, include the correct answer in the "answer" field.
+Respond with ONLY the JSON array, no additional text.
+"""
+
+evaluator_prompt = """
+You are an expert evaluator. Grade the following quiz submission and provide detailed feedback:
+
+{submission_details}
+
+Generate a JSON object with the following structure:
+{{
+  "feedback": "Detailed feedback on the answers",
+  "score": 85
+}}
+
+The score should be out of 100. Provide constructive feedback.
+Respond with ONLY the JSON object, no additional text.
+"""
 
 # --- Helper for parsing LLM output ---
 def parse_llm_output(text: str) -> list | dict:

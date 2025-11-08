@@ -5,3 +5,15 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist/
+build/
+chroma_db/
+test.db

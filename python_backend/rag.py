@@ -43,6 +43,17 @@ class RAGSystem:
             ids=[document_id]
         )
 
+    async def add_documents(self, texts: list, source: str):
+        """Adds multiple documents to the user's collection."""
+        for i, text in enumerate(texts):
+            document_id = f"{source}_{i}"
+            metadata = {"user_id": self.user_id, "source": source}
+            self.collection.add(
+                documents=[text],
+                metadatas=[metadata],
+                ids=[document_id]
+            )
+
     async def query(self, query_text: str, n_results: int = 5) -> str:
         """Queries the collection for relevant documents."""
         results = self.collection.query(
