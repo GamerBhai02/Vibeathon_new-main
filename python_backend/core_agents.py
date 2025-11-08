@@ -5,7 +5,15 @@ import re
 import json
 from sqlmodel import Session, select
 import google.generativeai as genai
-from .rag import RAGSystem
+
+# Try to import RAG - it's optional
+try:
+    from .rag import RAGSystem
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+    print("Warning: RAG system not available. Install with: pip install -r requirements-full.txt")
+
 from .models import Flashcard, Topic
 
 # --- Configuration ---
@@ -153,8 +161,16 @@ class TopicGenerator:
 
     async def generate_topic(self, prompt: str, user_id: int) -> dict:
         """Generates a topic, summary, and subtopics."""
-        rag_system = RAGSystem(str(user_id))
-        context = await rag_system.query(prompt, n_results=3)
+        # Try to get context from RAG if available
+        if RAG_AVAILABLE:
+            try:
+                rag_system = RAGSystem(str(user_id))
+                context = await rag_system.query(prompt, n_results=3)
+            except Exception as e:
+                print(f"Warning: RAG query failed: {e}")
+                context = "No additional context available."
+        else:
+            context = "No additional context available (RAG not installed)."
         
         formatted_prompt = topic_prompt.format(
             user_prompt=prompt, retrieved_context=context

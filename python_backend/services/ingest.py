@@ -3,19 +3,41 @@ import os
 import json
 from pathlib import Path
 from typing import List
-import magic
-import pytesseract
-from PIL import Image
-from pdf2image import convert_from_path
 from sqlmodel import Session
-import google.generativeai as genai
+
+# Optional imports - gracefully handle missing dependencies
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
+
+try:
+    import pytesseract
+    from PIL import Image
+    from pdf2image import convert_from_path
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
 
 from ..models import Document, Topic
-from ..rag import RAGSystem
+
+# Only import RAG if chromadb is available
+try:
+    from ..rag import RAGSystem
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
+if GEMINI_API_KEY and GEMINI_AVAILABLE:
     genai.configure(api_key=GEMINI_API_KEY)
 
 async def process_document(
@@ -30,7 +52,16 @@ async def process_document(
     3.  Uses Gemini to summarize the content and extract key topics.
     4.  Adds the full text to the RAG vector store.
     5.  Saves the extracted topics to the database.
+    
+    Note: This feature requires optional dependencies.
+    Install with: pip install -r requirements-full.txt
     """
+    if not MAGIC_AVAILABLE:
+        raise RuntimeError("Document processing requires python-magic. Install with: pip install -r requirements-full.txt")
+    
+    if not OCR_AVAILABLE:
+        raise RuntimeError("OCR processing requires pytesseract, PIL, and pdf2image. Install with: pip install -r requirements-full.txt")
+    
     try:
         mime = magic.Magic(mime=True)
         mime_type = mime.from_file(file_path)
@@ -57,10 +88,13 @@ async def process_document(
         # Summarize and extract topics with Gemini
         topics = await summarize_and_extract_topics_with_gemini(text_content)
         
-        # Add full text to RAG system for context retrieval
-        rag = RAGSystem(user_id)
-        source_filename = Path(file_path).name
-        await rag.add_documents(texts=[text_content], source=source_filename)
+        # Add full text to RAG system for context retrieval (if available)
+        if RAG_AVAILABLE:
+            rag = RAGSystem(user_id)
+            source_filename = Path(file_path).name
+            await rag.add_documents(texts=[text_content], source=source_filename)
+        else:
+            print("Warning: RAG system not available. Skipping document indexing.")
 
         # Save topics to the database
         saved_topics = []
@@ -92,6 +126,10 @@ async def summarize_and_extract_topics_with_gemini(text: str) -> List[dict]:
     """
     Uses the Gemini API to summarize text and extract a list of topics.
     """
+    if not GEMINI_AVAILABLE:
+        print("Warning: google-generativeai not available. Returning fallback content.")
+        return [{"topic": "General Content", "content": text[:4000]}]
+    
     if not GEMINI_API_KEY:
         print("Warning: GEMINI_API_KEY not found. Skipping summarization.")
         # Fallback to simple text splitting if no API key
@@ -143,4 +181,3 @@ async def summarize_and_extract_topics_with_gemini(text: str) -> List[dict]:
         print(f"Error calling Gemini API: {e}")
         # Fallback in case of API error
         return [{"topic": "Extraction Failed", "content": f"Could not process content due to an API error: {e}"}]
-

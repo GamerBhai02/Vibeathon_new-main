@@ -1,18 +1,22 @@
+# Core dependencies - minimal installation
 fastapi
 uvicorn[standard]
 sqlmodel
 httpx
 python-dotenv
-chromadb
-sentence-transformers
-google-api-python-client
 google-generativeai
 pydantic-settings
 sqlalchemy
-pytesseract
-pdf2image
-python-magic
-pillow
 websockets
 python-multipart
 python-jose[cryptography]
+
+# Optional heavy dependencies - only install if needed
+# Uncomment these if you need document processing features:
+# chromadb
+# sentence-transformers
+# pytesseract
+# pdf2image
+# python-magic
+# pillow
+# google-api-python-client

@@ -56,16 +56,25 @@ Agentverse Study Buddy is an intelligent exam preparation platform that leverage
 
 - Node.js 20+ (already available in Replit)
 - npm or yarn
+- Python 3.11+ (for backend features)
 
 ### Installation
 
 ```bash
-# Install dependencies
+# Install Node.js dependencies
 npm install
+
+# Install Python dependencies (minimal - recommended for deployment)
+pip install -r requirements.txt
+
+# OR install with full features (document processing, OCR, RAG)
+pip install -r requirements-full.txt
 
 # Start development server
 npm run dev
 ```
+
+**💡 Optimization Note**: The project uses a minimal dependency approach by default, reducing disk usage by ~95%. Document processing features (OCR, PDF, RAG) are optional. See `OPTIMIZATION_GUIDE.md` for details.
 
 The application will be available at `http://localhost:5000`
 

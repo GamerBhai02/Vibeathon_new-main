@@ -4,7 +4,14 @@ import os
 import json
 import re
 import google.generativeai as genai
-from ..rag import RAGSystem
+
+# Try to import RAG - it's optional
+try:
+    from ..rag import RAGSystem
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+    print("Warning: RAG system not available in TeacherAgent. Lessons will be generated without document context.")
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -17,8 +24,16 @@ class TeacherAgent:
     async def generate_lesson(self, topic_name: str, user_id: str) -> dict:
         """Creates a concise, engaging micro-lesson on a specific topic."""
 
-        rag = RAGSystem(user_id)
-        retrieved_docs = await rag.query(f"Content related to {topic_name}")
+        # Try to get context from RAG if available
+        if RAG_AVAILABLE:
+            try:
+                rag = RAGSystem(user_id)
+                retrieved_docs = await rag.query(f"Content related to {topic_name}")
+            except Exception as e:
+                print(f"Warning: RAG query failed in TeacherAgent: {e}")
+                retrieved_docs = "No document context available."
+        else:
+            retrieved_docs = "No document context available (RAG system not installed)."
 
         if not GEMINI_API_KEY:
             # Return a mock lesson if no API key

@@ -1,9 +1,16 @@
 """Agent for generating quizzes and mock exams"""
 
 from ..services.anthropic import call_anthropic_api
-from ..rag import RAGSystem
 import json
 from typing import List
+
+# Try to import RAG - it's optional
+try:
+    from ..rag import RAGSystem
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+    print("Warning: RAG system not available in QuizGenAgent. Quizzes will be generated without document context.")
 
 class QuizGenAgent:
     """Generates practice questions, quizzes, and mock exams."""
@@ -11,8 +18,16 @@ class QuizGenAgent:
     async def generate_questions(self, topic_name: str, difficulty: str, count: int, user_id: str) -> List[dict]:
         """Generates a list of practice questions on a given topic."""
 
-        rag = RAGSystem(user_id)
-        retrieved_docs = await rag.query(f"Content related to {topic_name} for a {difficulty} quiz")
+        # Try to get context from RAG if available
+        if RAG_AVAILABLE:
+            try:
+                rag = RAGSystem(user_id)
+                retrieved_docs = await rag.query(f"Content related to {topic_name} for a {difficulty} quiz")
+            except Exception as e:
+                print(f"Warning: RAG query failed in QuizGenAgent: {e}")
+                retrieved_docs = "No document context available."
+        else:
+            retrieved_docs = "No document context available (RAG system not installed)."
 
         system_prompt = """
         You are a quiz generation AI. Your task is to create a set of practice questions on a given topic, at a specified difficulty level. The questions should be in a multiple-choice format.
@@ -47,10 +62,18 @@ class QuizGenAgent:
     async def generate_mock_exam(self, exam_type: str, duration: int, total_marks: int, topics: List[str], user_id: str) -> dict:
         """Generates a comprehensive mock exam based on a set of topics."""
         
-        rag = RAGSystem(user_id)
+        # Try to get context from RAG if available
         context = ""
-        for topic in topics:
-            context += await rag.query(f"Content for a mock exam on {topic}") + "\n\n"
+        if RAG_AVAILABLE:
+            try:
+                rag = RAGSystem(user_id)
+                for topic in topics:
+                    context += await rag.query(f"Content for a mock exam on {topic}") + "\n\n"
+            except Exception as e:
+                print(f"Warning: RAG query failed in generate_mock_exam: {e}")
+                context = "No document context available."
+        else:
+            context = "No document context available (RAG system not installed)."
 
         system_prompt = """
         You are an expert exam creator. Your task is to generate a realistic mock exam based on a list of topics, duration, and total marks. The exam should have a mix of question types (e.g., multiple-choice, short answer) and cover the provided topics proportionally.

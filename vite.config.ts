@@ -1,7 +1,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+// Try to import Replit plugins, but don't fail if they're missing (optional dependencies)
+let runtimeErrorOverlay;
+try {
+  runtimeErrorOverlay = (await import("@replit/vite-plugin-runtime-error-modal")).default;
+} catch {
+  runtimeErrorOverlay = () => ({ name: 'runtime-error-overlay-stub' });
+}
 
 export default defineConfig({
   plugins: [
@@ -9,14 +16,16 @@ export default defineConfig({
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
+      ? await (async () => {
+          try {
+            const cartographer = await import("@replit/vite-plugin-cartographer");
+            const devBanner = await import("@replit/vite-plugin-dev-banner");
+            return [cartographer.cartographer(), devBanner.devBanner()];
+          } catch (e) {
+            console.log("Replit plugins not available (using minimal installation)");
+            return [];
+          }
+        })()
       : []),
   ],
   resolve: {

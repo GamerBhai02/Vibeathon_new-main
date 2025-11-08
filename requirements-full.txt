@@ -1,0 +1,12 @@
+# Full dependencies including document processing features
+# Use this for local development or if you need OCR/PDF/RAG features
+-r requirements.txt
+
+# Document processing and RAG features
+chromadb
+sentence-transformers
+pytesseract
+pdf2image
+python-magic
+pillow
+google-api-python-client

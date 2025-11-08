@@ -40,14 +40,23 @@ Replit is configured to run both the Node.js backend and Python backend.
    - Add all variables from `.env.example`
 3. Install Python dependencies:
    ```bash
+   # For minimal installation (recommended):
    pip install -r requirements.txt
+   
+   # For full features including document processing:
+   pip install -r requirements-full.txt
    ```
 4. Click "Run" to start the application
 5. The app will be available at your Replit URL
 
+**Important Note on Dependencies:**
+- By default, heavy dependencies (OCR, RAG, document processing) are optional
+- This reduces disk space usage by ~95% (from ~3.5GB to ~150MB)
+- See `OPTIMIZATION_GUIDE.md` for details on optional features
+
 **Configuration Files:**
 - `.replit` - Replit configuration
-- `replit.nix` - System packages
+- `replit.nix` - System packages (heavy packages commented out by default)
 - `start_python_backend.sh` - Python backend startup script
 
 **Notes:**
@@ -107,7 +116,11 @@ The Python backend (FastAPI) can be deployed to:
 1. Create a new project on Railway
 2. Connect your GitHub repository
 3. Add a new service and select "Deploy from GitHub repo"
-4. Set the start command: `uvicorn python_backend.main:app --host 0.0.0.0 --port $PORT`
+4. Set the start command: 
+   ```bash
+   pip install -r requirements.txt && uvicorn python_backend.main:app --host 0.0.0.0 --port $PORT
+   ```
+   Note: Use `requirements-full.txt` if you need document processing features
 5. Add environment variables
 6. Deploy
 
@@ -117,6 +130,7 @@ The Python backend (FastAPI) can be deployed to:
 3. Set:
    - Build Command: `pip install -r requirements.txt`
    - Start Command: `uvicorn python_backend.main:app --host 0.0.0.0 --port $PORT`
+   - Note: Use `requirements-full.txt` if you need document processing features
 4. Add environment variables
 5. Deploy
 
@@ -197,6 +211,15 @@ uvicorn python_backend.main:app --host 0.0.0.0 --port 8001
   - `tesseract-ocr` for OCR
   - `poppler-utils` for PDF processing
   - `libmagic` for file type detection
+- These are only needed if using `requirements-full.txt`
+- See `OPTIMIZATION_GUIDE.md` for dependency details
+
+### Disk Quota Exceeded
+- Use minimal installation: `pip install -r requirements.txt` (saves ~95% disk space)
+- Remove `node_modules` and reinstall: `rm -rf node_modules && npm install`
+- Check for large files: `du -sh * | sort -h`
+- Consider deploying Python backend separately from frontend
+- See `OPTIMIZATION_GUIDE.md` for optimization strategies
 
 ## Monitoring and Logs
 
