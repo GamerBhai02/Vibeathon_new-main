@@ -1,0 +1,3 @@
+# Lightweight PDF extraction dependencies
+pdfminer.six>=20221105
+google-generativeai

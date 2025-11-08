@@ -23,12 +23,12 @@ Agentverse Study Buddy is an intelligent exam preparation platform that leverage
 
 ### 📚 Core Capabilities
 
-- **Document Ingestion**: Upload PDFs, images, and text documents with automatic OCR processing
-- **Topic Extraction**: AI-powered identification of key topics with importance scoring
+- **Document Ingestion**: Upload PDFs with automatic lightweight text extraction (no OCR required)
+- **Topic Extraction**: AI-powered identification of key topics with importance scoring and Gemini enhancement
 - **Study Plans**: Personalized schedules generated based on exam deadlines and mastery levels
-- **Micro-Lessons**: Step-by-step explanations with citations from your uploaded materials
+- **Micro-Lessons**: AI-generated step-by-step explanations using Gemini for each extracted topic
 - **Practice Questions**: Progressive hint system (hint → steps → full solution)
-- **Mock Exams**: Full-screen exam mode with timer, grading, and performance breakdowns
+- **Mock Exams**: Intelligent exam generation with varied difficulty levels and question types using AI
 - **Flashcards**: Spaced repetition system using the SM-2 algorithm
 - **Placement Mode**: Company-specific prep with coding rounds and interview resources
 
@@ -64,17 +64,24 @@ Agentverse Study Buddy is an intelligent exam preparation platform that leverage
 # Install Node.js dependencies
 npm install
 
-# Install Python dependencies (minimal - recommended for deployment)
-pip install -r requirements.txt
+# Install Python dependencies for PDF extraction (lightweight)
+cd pdfExtraction && bash setup.sh && cd ..
 
-# OR install with full features (document processing, OCR, RAG)
-pip install -r requirements-full.txt
+# OR manually install Python dependencies
+pip install -r pdfExtraction/requirements.txt
 
 # Start development server
 npm run dev
 ```
 
-**💡 Optimization Note**: The project uses a minimal dependency approach by default, reducing disk usage by ~95%. Document processing features (OCR, PDF, RAG) are optional. See `OPTIMIZATION_GUIDE.md` for details.
+**💡 New Lightweight Approach**: The project now uses `pdfminer.six` for PDF text extraction, which is much lighter than OCR-based approaches and doesn't require heavy dependencies. The extraction includes intelligent topic detection and optional Gemini AI enhancement.
+
+**Features of the new PDF extraction**:
+- ✅ No OCR dependencies required (no Tesseract, pdf2image, etc.)
+- ✅ Works with system Python (no virtual environment needed)
+- ✅ Comprehensive failsafes - app never breaks on extraction errors
+- ✅ Optional Gemini AI enhancement for better topic extraction
+- ✅ Graceful fallbacks when Python or APIs are unavailable
 
 The application will be available at `http://localhost:5000`
 
