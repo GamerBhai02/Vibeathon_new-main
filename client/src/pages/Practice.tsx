@@ -132,7 +132,7 @@ export default function Practice() {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
-                <Badge variant={question.difficulty === "hard" ? "destructive" : "default"}>
+                <Badge variant={(question.difficulty as string) === "hard" ? "destructive" : "default"}>
                   {question.difficulty}
                 </Badge>
                 <Badge variant={question.confidence === "High" ? "default" : "secondary"}>
