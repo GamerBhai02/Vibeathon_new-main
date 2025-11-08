@@ -864,7 +864,7 @@ except Exception as e:
                 }
 
             } catch (fileError) {
-                console.error(`Error processing file ${file.originalname}:`, fileError);
+                console.error('Error processing file:', file.originalname, fileError);
                 errors.push(`Failed to process ${file.originalname}`);
                 
                 // Failsafe: create a placeholder topic even on error
